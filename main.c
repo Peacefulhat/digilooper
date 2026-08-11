@@ -1,34 +1,46 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
 #include <stdint.h>
 #include <SDL3/SDL.h>
 
-typedef struct {
-    float Red;
-    float Green;
-    float Blue;
-    float Alpha;
-} color;
 
 #define SAMPLE_BUFFER_SIZE 1024
 #define SAMPLE_RATE 44100
 #define MINIMUN_AUDIO (SAMPLE_BUFFER_SIZE * sizeof(float))
+#define NEXT_SEMI_TONE 1.0594631f // 2^(1/12)
+#define ROOT_NOTE 440
 uint32_t CurrentSineSample = 0;
+//where are in the sine wave
+float SampleBuffer[SAMPLE_BUFFER_SIZE] = {};
 
-float   SampleBuffer[SAMPLE_BUFFER_SIZE] = {};
+typedef struct {
+    float Frequency;
+    uint32_t FrameCount; // where are in the sine wave
+}note;
 
-void SineWave(SDL_AudioStream *Stream, float* Samples, uint32_t SampleSize, float Amplitude)
+void NoteUpdate(note* Note, float* Buffer, uint32_t BufferSize){
+    
+}
+
+float GetFreqFromSemiTone(float Semitone)
 {
-    int32_t Freq = 440;
-    for (uint32_t Index = 0; Index < SampleSize; Index++) {
+    return(ROOT_NOTE * pow(NEXT_SEMI_TONE, Semitone));
+}
 
-        float Time = (float)CurrentSineSample/(float)SAMPLE_RATE;
-        Samples[Index] = Amplitude * SDL_sinf(2 * SDL_PI_F * Time * Freq);
-        CurrentSineSample++;
+void SineWave(SDL_AudioStream *Stream, float* Samples, uint32_t SampleSize, uint32_t Freq)
+{
+    if(SDL_GetAudioStreamQueued(Stream) < MINIMUN_AUDIO) {
+        for (uint32_t Index = 0; Index < SampleSize; Index++) {
+
+            float Time = (float)CurrentSineSample/(float)SAMPLE_RATE;
+            Samples[Index] = 1.0f * SDL_sinf(2 * SDL_PI_F * Time * Freq);
+            CurrentSineSample++;
+        }
+        CurrentSineSample %= SAMPLE_RATE;
+        SDL_PutAudioStreamData(Stream, Samples, (sizeof(float) * SampleSize));
     }
-    CurrentSineSample %= SAMPLE_RATE;
-    SDL_PutAudioStreamData(Stream, Samples, (sizeof(float) * SampleSize));
 }
 
 int main()
@@ -41,29 +53,30 @@ int main()
     SDL_AudioSpec Spec;
     Spec.channels = 1;
     Spec.format = SDL_AUDIO_F32;
-    Spec.freq =44100;
+    Spec.freq = 44100;
     SDL_AudioStream *Stream  = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &Spec, NULL, NULL);
     SDL_ResumeAudioStreamDevice(Stream);
 
+
     SDL_Event event;
-    while (1) {
+    uint32_t Freq = 440;
+    while (event.type!=SDL_EVENT_QUIT) {
         SDL_PollEvent(&event);
-        int32_t Playing = 0;
         const bool *KeyBoardState = SDL_GetKeyboardState(NULL);
-        if (event.type == SDL_EVENT_QUIT) {
-            break;
-        }
+
         if(KeyBoardState[SDL_SCANCODE_Z]) {
-
-
-            if(SDL_GetAudioStreamQueued(Stream) < MINIMUN_AUDIO) {
-                SineWave(Stream, SampleBuffer, SAMPLE_BUFFER_SIZE, 0.5);
-            }
-
-
+            Freq = GetFreqFromSemiTone(0);
+        } else  if(KeyBoardState[SDL_SCANCODE_S]) {
+            Freq = GetFreqFromSemiTone(1);
+        } else if(KeyBoardState[SDL_SCANCODE_X]) {
+            Freq = GetFreqFromSemiTone(2);
+        } else if(KeyBoardState[SDL_SCANCODE_D]) {
+            Freq = GetFreqFromSemiTone(3);
+        } else {
+            Freq = 0;
         }
-        color Color = {0x18, 0x18, 0x18, 0x1};
-        SDL_SetRenderDrawColorFloat(Renderer, Color.Red, Color.Green, Color.Blue, Color.Alpha);
+        SineWave(Stream, SampleBuffer, SAMPLE_BUFFER_SIZE, Freq);
+        SDL_SetRenderDrawColorFloat(Renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
         SDL_RenderClear(Renderer);
         SDL_RenderPresent(Renderer);
     }
