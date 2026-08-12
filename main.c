@@ -1,54 +1,55 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <math.h>
-#include <stdint.h>
-#include <SDL3/SDL.h>
-#include <assert.h>
 #include "note.h"
+
+#define SAMPLE_SIZE 32
+#define CHANNELS    1
 
 global_variable float Samples[SAMPLE_BUFFER_SIZE] = {}; // buffer where we write our data before playing
 global_variable notes KeyboardNotes = {};               // Buffer to store available keyboard notes
 global_variable uint32_t FrameCount = 0;
 
-int main()
+#define BEATS_PER_MIN  120 // Beats per minute
+#define BAR_BEATS      4
+#define BAR_QUANT      32
+#define BEAT_SECS      60.0f/BEATS_PER_MIN  // amount of beast in milliseoncds
+#define BAR_SECS       (BAR_BEATS * BEAT_SECS)
+#define QUANT_SECS     (BAR_SECS / BAR_QUANT)
+
+typedef float quant;
+typedef struct {
+    KeyboardKey Key;
+    bool Keystate;
+    float Semitone;
+    quant TimeStamp;
+} event;
+
+int main(void)
 {
-    srand(time(0));
-    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
-    SDL_Window* Window     =  SDL_CreateWindow("Digilooper", 800, 600, SDL_WINDOW_OPENGL);
-    SDL_Renderer* Renderer = SDL_CreateRenderer(Window, NULL);
+    InitWindow(800, 450, "raylib example - basic window");
+    InitAudioDevice();
+    SetAudioStreamBufferSizeDefault(SAMPLE_BUFFER_SIZE);
+    AudioStream Stream = LoadAudioStream(SAMPLE_RATE, SAMPLE_SIZE, CHANNELS);
+    PlayAudioStream(Stream);
+    SetTargetFPS(60);
 
-    SDL_AudioSpec Spec;
-    Spec.channels          = 1;
-    Spec.format            = SDL_AUDIO_F32;
-    Spec.freq              = 44100;
-
-    SDL_AudioStream *Stream  = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &Spec, NULL, NULL);
-    SDL_ResumeAudioStreamDevice(Stream);
-    SDL_Event event;
-
-
+    float BeatTime = 0.0;
     type_info ClampType = FLOAT;
     type Low            = {.AsF32 = -1.0f};
     type High           = {.AsF32 =  1.0f};
     KeyBoardNotes(&KeyboardNotes);
 
-    while (event.type!=SDL_EVENT_QUIT) {
-        SDL_PollEvent(&event);
-        const bool *KeyBoardState = SDL_GetKeyboardState(NULL);
+    while (!WindowShouldClose()) {
+        float Quant = (GetFrameTime()/(float)QUANT_SECS);
         uint32_t NotesPlaying = 0;
         for(uint32_t Index = 0;  Index < KeyboardNotes.Count; Index++) {
-
-            if(KeyBoardState[KeyboardNotes.NoteKeys[Index].Key]) {
+            if(IsKeyDown(KeyboardNotes.NoteKeys[Index].Key)) {
                 KeyboardNotes.NoteKeys[Index].Playing = true;
                 NotesPlaying += 1;
             }
-            if(!KeyBoardState[KeyboardNotes.NoteKeys[Index].Key]) {
+            if(!IsKeyDown(KeyboardNotes.NoteKeys[Index].Key)) {
                 KeyboardNotes.NoteKeys[Index].Playing = false;
             }
         }
-
-        if(SDL_GetAudioStreamQueued(Stream) < MINIMUN_AUDIO) {
+        if(IsAudioStreamProcessed(Stream)) {
             if(NotesPlaying) {
                 for(int32_t Y = 0; Y <KeyboardNotes.Count; Y++) {
                     if(KeyboardNotes.NoteKeys[Y].Playing) {
@@ -56,20 +57,22 @@ int main()
                                    1.0f/NotesPlaying, SAMPLE_BUFFER_SIZE);
                     }
                     for(int32_t X = 0; X < SAMPLE_BUFFER_SIZE; X++) {
-                        Clamp(&Samples[X], Low, High, FLOAT);
+                        Clamp2(&Samples[X], Low, High, FLOAT);
                     }
                 }
-
                 FrameCount += SAMPLE_BUFFER_SIZE; // updating the frame count
-                SDL_PutAudioStreamData(Stream, Samples,(sizeof(float) * SAMPLE_BUFFER_SIZE));
+                UpdateAudioStream(Stream, Samples, SAMPLE_BUFFER_SIZE);
                 CleanBuffer(Samples, SAMPLE_BUFFER_SIZE);
             }
         }
-        SDL_SetRenderDrawColorFloat(Renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-        SDL_RenderClear(Renderer);
-        SDL_RenderPresent(Renderer);
+        BeginDrawing();
+        ClearBackground(BLACK);
+        EndDrawing();
     }
-    SDL_DestroyWindow(Window);
-    SDL_Quit();
-    return(0);
+    UnloadAudioStream(Stream);
+    CloseAudioDevice();
+    CloseWindow();
+    return 0;
 }
+
+

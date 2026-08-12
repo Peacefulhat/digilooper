@@ -2,9 +2,11 @@
 #define NOTE_H
 
 #include <stdio.h>
-#include <SDL3/SDL.h>
+#include <raylib.h>
+#include <stdlib.h>
 #include <math.h>
 #include <assert.h>
+#include <stdint.h>
 
 #define  global_variable static
 #define  local_persist   static
@@ -21,7 +23,7 @@
 typedef struct {
     bool Playing;
     uint32_t Frequency;
-    SDL_Scancode Key;
+    KeyboardKey Key;
 } note;
 
  // store state of a added notes
@@ -46,8 +48,8 @@ typedef note (*note_callback)(float Semitone);
 void NoteUpdate(note* Note, float* Buffer, uint32_t FrameCount, float Amplitude, uint32_t BufferSize);
 float GetFreqFromSemiTone(float Semitone);
 void CleanBuffer(float* Buffer, uint32_t BufferSize);
-void AddNote(notes* Notes, note_callback Notefn, float Semitone, SDL_Scancode Key);
+void AddNote(notes* Notes, note_callback Notefn, float Semitone, KeyboardKey Key);
 void KeyBoardNotes(notes* Notes);
-void Clamp(void* Data, type Low, type High, type_info Info);
+void Clamp2(void* Data, type Low, type High, type_info Info);
 
 #endif

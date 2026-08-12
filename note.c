@@ -24,7 +24,7 @@ internal note GetNote(float Semitone){
     };
 }
 
-void AddNote(notes* Notes, note_callback Notefn, float Semitone, SDL_Scancode Key)
+void AddNote(notes* Notes, note_callback Notefn, float Semitone, KeyboardKey Key)
 {
     if(!Notes || !Notefn) {
         return;
@@ -42,7 +42,7 @@ void NoteUpdate(note* Note, float* Buffer, uint32_t FrameCount, float Amplitude,
     }
     for (uint32_t Index = 0; Index < BufferSize; Index++) {
         float Time = (float)(FrameCount + Index)/(float)SAMPLE_RATE;
-        Buffer[Index] += Amplitude * SDL_sinf(2 * SDL_PI_F * Time * Note->Frequency);
+        Buffer[Index] += Amplitude * sinf(2 * PI * Time * Note->Frequency);
     }
 }
 
@@ -51,22 +51,22 @@ void KeyBoardNotes(notes* Notes)
     if(!Notes) {
         return;
     }
-    AddNote(Notes, GetNote, 0, SDL_SCANCODE_Z);
-    AddNote(Notes, GetNote, 1, SDL_SCANCODE_S);
-    AddNote(Notes, GetNote, 2, SDL_SCANCODE_X);
-    AddNote(Notes, GetNote, 3, SDL_SCANCODE_D);
-    AddNote(Notes, GetNote, 4, SDL_SCANCODE_C);
-    AddNote(Notes, GetNote, 5, SDL_SCANCODE_V);
-    AddNote(Notes, GetNote, 6, SDL_SCANCODE_G);
-    AddNote(Notes, GetNote, 7, SDL_SCANCODE_B);
-    AddNote(Notes, GetNote, 8, SDL_SCANCODE_H);
-    AddNote(Notes, GetNote, 9, SDL_SCANCODE_N);
-    AddNote(Notes, GetNote, 10, SDL_SCANCODE_J);
-    AddNote(Notes, GetNote, 11, SDL_SCANCODE_M);
-    AddNote(Notes, GetNote, 12, SDL_SCANCODE_COMMA);
+    AddNote(Notes, GetNote, 0, KEY_Z);
+    AddNote(Notes, GetNote, 1, KEY_S);
+    AddNote(Notes, GetNote, 2, KEY_X);
+    AddNote(Notes, GetNote, 3, KEY_D);
+    AddNote(Notes, GetNote, 4, KEY_C);
+    AddNote(Notes, GetNote, 5, KEY_V);
+    AddNote(Notes, GetNote, 6, KEY_G);
+    AddNote(Notes, GetNote, 7, KEY_B);
+    AddNote(Notes, GetNote, 8, KEY_H);
+    AddNote(Notes, GetNote, 9, KEY_N);
+    AddNote(Notes, GetNote, 10, KEY_J);
+    AddNote(Notes, GetNote, 11, KEY_M);
+    AddNote(Notes, GetNote, 12, KEY_COMMA);
 }
 
-void Clamp(void* Data, type Low, type High, type_info Info)
+void Clamp2(void* Data, type Low, type High, type_info Info)
 {
     if(!Data) {
         return;
