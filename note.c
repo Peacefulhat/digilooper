@@ -46,7 +46,7 @@ void NoteUpdate(note* Note, float* Buffer, uint32_t FrameCount, float Amplitude,
     }
 }
 
-void KeyBoardNotes(notes* Notes)
+void AddKeyBoardNotes(notes* Notes)
 {
     if(!Notes) {
         return;

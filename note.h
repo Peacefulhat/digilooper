@@ -12,7 +12,7 @@
 #define  local_persist   static
 #define  internal        static
 
-#define SAMPLE_BUFFER_SIZE 1024
+#define SAMPLE_BUFFER_SIZE 2048
 #define SAMPLE_RATE 44100
 #define MINIMUN_AUDIO (SAMPLE_BUFFER_SIZE * sizeof(float))
 #define KEYBOARD_NOTES_CAPACITY 15
@@ -22,7 +22,7 @@
 // note key on keyboard and its playing state
 typedef struct {
     bool Playing;
-    uint32_t Frequency;
+    float Frequency;
     KeyboardKey Key;
 } note;
 
@@ -49,7 +49,7 @@ void NoteUpdate(note* Note, float* Buffer, uint32_t FrameCount, float Amplitude,
 float GetFreqFromSemiTone(float Semitone);
 void CleanBuffer(float* Buffer, uint32_t BufferSize);
 void AddNote(notes* Notes, note_callback Notefn, float Semitone, KeyboardKey Key);
-void KeyBoardNotes(notes* Notes);
+void AddKeyBoardNotes(notes* Notes);
 void Clamp2(void* Data, type Low, type High, type_info Info);
 
 #endif
