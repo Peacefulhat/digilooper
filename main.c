@@ -141,7 +141,6 @@ int main(void)
 //                PrintEvents(&Events);
                 State = REPLAY;
             } else if( State == WAIT_UNTIL_END_OF_BAR) {
-                Events.Count = 0;
                 State = REPLAY;
             }
         }
@@ -215,10 +214,27 @@ int main(void)
 
             DrawCircleV( Center, Radius, RED);
         }
+        uint32_t AmountOfBarsInRecording  =1;
+        
+        if(Events.Count > 0 && Events.EventsArr[Events.Count - 1].TimeStamp > 0) {
 
+            AmountOfBarsInRecording = (Events.EventsArr[Events.Count - 1].TimeStamp + BAR_QUANT - 1)/BAR_QUANT;
 
-        for (uint32_t Y = 0; Y < BAR_BEATS; ++Y) {
-            float BeatLength = (float)GetScreenWidth() / (float)BAR_BEATS;
+        }
+        float QuantLength = (float)GetScreenWidth() / (float)(BAR_QUANT * AmountOfBarsInRecording);
+        float SemitoneHeight = (float)GetScreenHeight()/(float)KEYBOARD_NOTES_CAPACITY;
+        for(int i =0; i < Events.Count; ++i) {
+            Vector2 Center = {Events.EventsArr[i].TimeStamp * QuantLength, Events.EventsArr[i].Semitonei * SemitoneHeight};
+            if(Events.EventsArr[i].Start) {
+                DrawCircleV(Center, 10, RED);
+            } else {
+                DrawCircleV(Center, 10, BLUE);
+            }
+        }
+
+        float BeatLength = (float)GetScreenWidth() / (float)(BAR_BEATS * AmountOfBarsInRecording);
+        for (uint32_t Y = 0; Y < BAR_BEATS * AmountOfBarsInRecording; ++Y) {
+
             Vector2 StartPos = {(Y * BeatLength), 0.0f};
             Vector2 EndPos   = {(Y * BeatLength), GetScreenHeight()};
             Color LineColor  = WHITE;
@@ -226,7 +242,8 @@ int main(void)
         }
 
         // moving line
-        float MLineX = (float)(fmodf(BeatTime, BAR_SECS) / BAR_SECS) * GetScreenWidth();
+        float MLineX =
+        (fmodf(BeatTime, BAR_SECS * AmountOfBarsInRecording) / (float)(BAR_SECS * AmountOfBarsInRecording) )* GetScreenWidth();
         Vector2 MLineStartPos = { MLineX, 0.0f };
         Vector2 MLineEndPos   = {MLineX, GetScreenHeight()};
 
