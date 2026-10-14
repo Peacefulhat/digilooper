@@ -1,6 +1,70 @@
 #include "note.h"
 
+void InitVector(NoteVec* Notes, uint32_t InitCapacity)
+{
+    if(!Notes) {
+        printf("InitVector: not a valid NoteVec ");
+        return;
+    }
+    Notes->Data = NULL;
+    Notes->Count = 0;
+    Notes->Capacity = InitCapacity;
+}
+
+void AppendItem(NoteVec* Notes, note_released Note)
+{
+    if(!Notes) {
+        printf("InitVector: not a valid NoteVec ");
+        return;
+    }
+
+    while(Notes->Count > Notes->Capacity) {
+        Notes->Capacity *= 2;
+    }
+
+    Notes->Data = realloc(Notes->Data, sizeof(note) * Notes->Capacity);
+    assert(Notes->Data != NULL && "Buy More ram");
+    Notes->Data[Notes->Count++] = Note;
+}
+
+void PopItem(NoteVec* Notes)
+{
+    if(!Notes) {
+        printf("InitVector: not a valid NoteVec ");
+        return;
+    }
+    if(Notes->Count > 0) {
+        note_released EmptyNote = {};
+        Notes->Data[Notes->Count--] = EmptyNote;
+    }
+}
+
+
+void FreeNoteVecData(NoteVec* Notes)
+{
+    if(!Notes) {
+        printf("FreeNotesData: not a valid NoteVec");
+        return;
+    }
+    if(Notes->Data == NULL) {
+        return;
+    }
+    free(Notes->Data);
+    Notes->Capacity = DA_INIT_CAP;
+    Notes->Count = 0;
+}
+
+
 //Todo:: Error Logging
+static float Min(float A, float B)
+{
+    if(A < B) {
+        return(A);
+    } else {
+        return(B);
+    }
+}
+
 
 float GetFreqFromSemiTone(float Semitone)
 {
@@ -36,19 +100,35 @@ void AddNote(notes* Notes, note_callback Notefn, float Semitone, KeyboardKey Key
     Notes->Count++;
 }
 
-void NoteUpdate(note* Note, float* Buffer, uint32_t FrameCount, float Amplitude, uint32_t BufferSize)
+void NotePress(note* Note, uint32_t FrameCount)
 {
-    if(!Note || !Buffer) {
+    if(!Note) {
+        printf("NotePlay: Not a valid note\n");
         return;
     }
-    for (uint32_t Index = 0; Index < BufferSize; Index++) {
-        float Time = (float)(FrameCount + Index)/(float)SAMPLE_RATE;
-        Buffer[Index] += Amplitude * sinf(2 * PI * Time * Note->Frequency);
+    Note->Playing = true;
+    Note->FrameStamp = FrameCount;
+}
+
+void NoteRelease(note* Note, NoteVec* Notes, uint32_t FrameCount)
+{
+    if(!Note) {
+        printf("NotePlay: Not a valid note\n");
+        return;
     }
+    
+    if(!Note->Playing) {
+        return;
+    }
+    Note->Playing = false;
+    float UnclippedVolume = (float)(FrameCount - Note->FrameStamp)/(float)(ATTACK_FRAME);
+    float Volume = Min(UnclippedVolume, 1.0f); // Volume in terms of sound
+    note_released RNote = {.FrameStamp = FrameCount, .Key = Note->Key, .Frequency = Note->Frequency, .Volume = Volume};
+    AppendItem(Notes, RNote);
 }
 
 // return sample for specific framecount
-float NoteUpdate2(note* Note, uint32_t FrameCount)
+float NoteUpdate(note* Note, uint32_t FrameCount)
 {
     float Sample = (0.0f);
     if(!Note) {
@@ -56,8 +136,10 @@ float NoteUpdate2(note* Note, uint32_t FrameCount)
         printf("NoteUpdate: Failed to generate Sample for given Frame Count");
         return (Sample);
     }
+    float UnclippedVolume = (float)(FrameCount - Note->FrameStamp)/(float)(ATTACK_FRAME);
+    float Volume = Min(UnclippedVolume, 1.0f); // Volume in terms of sound
     float Time = (float)(FrameCount)/(float)SAMPLE_RATE;
-    Sample = sinf(2 * PI * Time * Note->Frequency);
+    Sample = sinf(2 * PI * Time * Note->Frequency) * Volume;
     return (Sample);
 }
 

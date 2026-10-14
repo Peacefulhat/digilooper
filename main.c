@@ -1,4 +1,6 @@
+#define DEBUG_DA
 #include "note.h"
+
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
 #define SAMPLE_SIZE 32
@@ -7,6 +9,7 @@
 global_variable float Samples[SAMPLE_BUFFER_SIZE] = {};
 global_variable notes KeyBoardNotes = {};
 global_variable notes NotesReplay = {};
+global_variable NoteVec NotesReleased = {};
 global_variable uint32_t FrameCount = 0;
 
 #define EVENT_BUFFER_CAPACITY 500000
@@ -106,7 +109,11 @@ int main(void)
 
                 for(int i =0; i < Events.Count; ++i) {
                     if(Events.EventsArr[i].TimeStamp ==  QuantToPlay) {
-                        NotesReplay.NoteKeys[Events.EventsArr[i].Semitonei].Playing = Events.EventsArr[i].Start;
+                        if(Events.EventsArr[i].Start) {
+                            NotePress(&NotesReplay.NoteKeys[Events.EventsArr[i].Semitonei], FrameCount);
+                        } else {
+                            NoteRelease(&NotesReplay.NoteKeys[Events.EventsArr[i].Semitonei], &NotesReleased, FrameCount);
+                        }
                     }
                 }
             }
@@ -131,12 +138,11 @@ int main(void)
         if(IsKeyPressed(KEY_R)) {
             if(State == REPLAY) {
                 State = WAIT_UNTIL_END_OF_BAR;
-
-
-                for(uint32_t Index = 0; Index < NotesReplay.Count; Index++) {
-                    NotesReplay.NoteKeys[Index].Playing = false;
-                }
                 Events.Count = 0; // resetting the event counts
+                for(uint32_t NoteIndex = 0; NoteIndex < NotesReplay.Count; NoteIndex++) {
+                    NoteRelease(&NotesReplay.NoteKeys[NoteIndex], &NotesReleased, FrameCount);
+                }
+
             } else if(State == RECORD) {
 //                PrintEvents(&Events);
                 State = REPLAY;
@@ -145,24 +151,24 @@ int main(void)
             }
         }
 
-        uint32_t NotesPlaying = 0;
 
-        for(uint32_t Index = 0;  Index < KeyBoardNotes.Count; Index++) {
-            if(IsKeyDown(KeyBoardNotes.NoteKeys[Index].Key)) {
-                if(!KeyBoardNotes.NoteKeys[Index].Playing) {
-                    KeyBoardNotes.NoteKeys[Index].Playing = true;
+
+        for(uint32_t NoteIndex = 0;  NoteIndex < KeyBoardNotes.Count; NoteIndex++) {
+            if(IsKeyDown(KeyBoardNotes.NoteKeys[NoteIndex].Key)) {
+                if(!KeyBoardNotes.NoteKeys[NoteIndex].Playing) {
+                    NotePress(&KeyBoardNotes.NoteKeys[NoteIndex], FrameCount);
 
                     if(State == RECORD) {
-                        event Event = {.TimeStamp = Quant, .Start = true, .Semitonei = Index};
+                        event Event = {.TimeStamp = Quant, .Start = true, .Semitonei = NoteIndex};
                         AddEvent(&Events, Event);
                     }
                 }
             }
-            if(!IsKeyDown(KeyBoardNotes.NoteKeys[Index].Key) ) {
-                if(KeyBoardNotes.NoteKeys[Index].Playing) {
-                    KeyBoardNotes.NoteKeys[Index].Playing = false;
+            if(!IsKeyDown(KeyBoardNotes.NoteKeys[NoteIndex].Key) ) {
+                if(KeyBoardNotes.NoteKeys[NoteIndex].Playing) {
+                    NoteRelease(&KeyBoardNotes.NoteKeys[NoteIndex], &NotesReleased, FrameCount);
                     if(State == RECORD) {
-                        event Event = {.TimeStamp = Quant, .Start = false, .Semitonei = Index};
+                        event Event = {.TimeStamp = Quant, .Start = false, .Semitonei = NoteIndex};
                         AddEvent(&Events, Event);
                     }
                 }
@@ -172,33 +178,49 @@ int main(void)
 
         if(IsAudioStreamProcessed(Stream)) {
 
+            for(int32_t SampleIndex = 0; SampleIndex < SAMPLE_BUFFER_SIZE; SampleIndex++) {
+                // cleaning the current sample.
+                Samples[SampleIndex] = 0.0f;
 
-            NotesPlaying = 0;
-            for(int32_t Y = 0; Y <KeyBoardNotes.Count; Y++) {
-                if(KeyBoardNotes.NoteKeys[Y].Playing || NotesReplay.NoteKeys[Y].Playing) {
-                    NotesPlaying += 1;
-                }
-            }
-
-            if(NotesPlaying) {
-                for(int32_t Y = 0; Y <KeyBoardNotes.Count; Y++) {
-
-                    if(KeyBoardNotes.NoteKeys[Y].Playing || NotesReplay.NoteKeys[Y].Playing) {
-
-                        NoteUpdate(&KeyBoardNotes.NoteKeys[Y],Samples, FrameCount,
-                                   1.0f/NotesPlaying, SAMPLE_BUFFER_SIZE);
+                uint32_t NotesPlaying = 0;
+                // checking what notes are playing for current sample
+                // Keyboard notes currently playing
+                for(int32_t NoteIndex = 0; NoteIndex <KeyBoardNotes.Count; NoteIndex++) {
+                    if(KeyBoardNotes.NoteKeys[NoteIndex].Playing) {
+                        NotesPlaying += 1;
                     }
-
                 }
-                for(int32_t X = 0; X < SAMPLE_BUFFER_SIZE; X++) {
-                    Clamp2(&Samples[X], Low, High, FLOAT);
-                }
-                FrameCount += SAMPLE_BUFFER_SIZE; // updating the frame count
-                UpdateAudioStream(Stream, Samples, SAMPLE_BUFFER_SIZE);
-                CleanBuffer(Samples, SAMPLE_BUFFER_SIZE);
 
+                // replay notes currently playing
+                for(int32_t NoteIndex = 0; NoteIndex <NotesReplay.Count; NoteIndex++) {
+                    if(NotesReplay.NoteKeys[NoteIndex].Playing) {
+                        NotesPlaying += 1;
+                    }
+                }
+
+                // if there are any keyboardnotes playing for sample, update the note and add it to sample
+                if (NotesPlaying) {
+                    float Amplitude = 1.0f/NotesPlaying;
+                    for(int32_t NoteIndex = 0; NoteIndex <KeyBoardNotes.Count; NoteIndex++) {
+                        if(KeyBoardNotes.NoteKeys[NoteIndex].Playing) {
+
+                            Samples[SampleIndex] += NoteUpdate(&KeyBoardNotes.NoteKeys[NoteIndex], FrameCount) * Amplitude;
+                        }
+                    }
+                    // if there are any replaynote playing for sample, update the note and add it to sample
+                    for(int32_t NoteIndex = 0; NoteIndex <NotesReplay.Count; NoteIndex++) {
+                        if(NotesReplay.NoteKeys[NoteIndex].Playing) {
+                            Samples[SampleIndex] += NoteUpdate(&NotesReplay.NoteKeys[NoteIndex], FrameCount) * Amplitude;
+                        }
+                    }
+                    // clamp the smaple
+                    Clamp2(&Samples[SampleIndex], Low, High, FLOAT);
+                }
+                FrameCount += 1;
             }
+            UpdateAudioStream(Stream, Samples, SAMPLE_BUFFER_SIZE);
         }
+        
         BeginDrawing();
         ClearBackground(BgColor);
         Vector2 Center = {(GetScreenWidth() - 30.0f), 30.0f};
