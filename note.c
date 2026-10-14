@@ -18,8 +18,9 @@ void CleanBuffer(float* Buffer, uint32_t BufferSize)
     }
 }
 
-internal note GetNote(float Semitone){
-    return(note){
+internal note GetNote(float Semitone)
+{
+    return(note) {
         .Frequency = GetFreqFromSemiTone(Semitone)
     };
 }
@@ -37,13 +38,27 @@ void AddNote(notes* Notes, note_callback Notefn, float Semitone, KeyboardKey Key
 
 void NoteUpdate(note* Note, float* Buffer, uint32_t FrameCount, float Amplitude, uint32_t BufferSize)
 {
-    if(!Note || !Buffer){
+    if(!Note || !Buffer) {
         return;
     }
     for (uint32_t Index = 0; Index < BufferSize; Index++) {
         float Time = (float)(FrameCount + Index)/(float)SAMPLE_RATE;
         Buffer[Index] += Amplitude * sinf(2 * PI * Time * Note->Frequency);
     }
+}
+
+// return sample for specific framecount
+float NoteUpdate2(note* Note, uint32_t FrameCount)
+{
+    float Sample = (0.0f);
+    if(!Note) {
+        // logging
+        printf("NoteUpdate: Failed to generate Sample for given Frame Count");
+        return (Sample);
+    }
+    float Time = (float)(FrameCount)/(float)SAMPLE_RATE;
+    Sample = sinf(2 * PI * Time * Note->Frequency);
+    return (Sample);
 }
 
 void AddKeyBoardNotes(notes* Notes)
@@ -71,7 +86,7 @@ void Clamp2(void* Data, type Low, type High, type_info Info)
     if(!Data) {
         return;
     }
-    
+
     if(Info == INT) {
         if(*((int32_t*)Data) < Low.AsI32) {
             *((int32_t*)Data) = Low.AsI32;

@@ -1,6 +1,6 @@
 #ifndef NOTE_H
 #define NOTE_H
-
+/*TODO: for now printf() is used for logging thing, do something better*/
 #include <stdio.h>
 #include <raylib.h>
 #include <stdlib.h>
@@ -26,7 +26,7 @@ typedef struct {
     KeyboardKey Key;
 } note;
 
- // store state of a added notes
+// store state of a added notes
 typedef struct {
     note NoteKeys[KEYBOARD_NOTES_CAPACITY];
     uint32_t Count;
@@ -44,7 +44,7 @@ typedef union {
 } type;
 
 typedef note (*note_callback)(float Semitone);
-
+float NoteUpdate2(note* Note, uint32_t FrameCount);
 void NoteUpdate(note* Note, float* Buffer, uint32_t FrameCount, float Amplitude, uint32_t BufferSize);
 float GetFreqFromSemiTone(float Semitone);
 void CleanBuffer(float* Buffer, uint32_t BufferSize);

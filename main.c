@@ -188,9 +188,10 @@ int main(void)
                         NoteUpdate(&KeyBoardNotes.NoteKeys[Y],Samples, FrameCount,
                                    1.0f/NotesPlaying, SAMPLE_BUFFER_SIZE);
                     }
-                    for(int32_t X = 0; X < SAMPLE_BUFFER_SIZE; X++) {
-                        Clamp2(&Samples[X], Low, High, FLOAT);
-                    }
+
+                }
+                for(int32_t X = 0; X < SAMPLE_BUFFER_SIZE; X++) {
+                    Clamp2(&Samples[X], Low, High, FLOAT);
                 }
                 FrameCount += SAMPLE_BUFFER_SIZE; // updating the frame count
                 UpdateAudioStream(Stream, Samples, SAMPLE_BUFFER_SIZE);
@@ -215,7 +216,7 @@ int main(void)
             DrawCircleV( Center, Radius, RED);
         }
         uint32_t AmountOfBarsInRecording  =1;
-        
+
         if(Events.Count > 0 && Events.EventsArr[Events.Count - 1].TimeStamp > 0) {
 
             AmountOfBarsInRecording = (Events.EventsArr[Events.Count - 1].TimeStamp + BAR_QUANT - 1)/BAR_QUANT;
@@ -243,7 +244,7 @@ int main(void)
 
         // moving line
         float MLineX =
-        (fmodf(BeatTime, BAR_SECS * AmountOfBarsInRecording) / (float)(BAR_SECS * AmountOfBarsInRecording) )* GetScreenWidth();
+            (fmodf(BeatTime, BAR_SECS * AmountOfBarsInRecording) / (float)(BAR_SECS * AmountOfBarsInRecording) )* GetScreenWidth();
         Vector2 MLineStartPos = { MLineX, 0.0f };
         Vector2 MLineEndPos   = {MLineX, GetScreenHeight()};
 
