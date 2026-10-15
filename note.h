@@ -63,6 +63,8 @@ typedef union {
 } type;
 
 typedef note (*note_callback)(float Semitone);
+bool NoteReleaseDone(note_released* Note, uint32_t FrameCount);
+float NoteReleasedUpdate(note_released* Note, uint32_t FrameCount);
 float NoteUpdate(note* Note, uint32_t FrameCount);
 void NotePress(note* Note, uint32_t FrameCount);
 void NoteRelease(note* Note, NoteVec* Notes, uint32_t FrameCount);
@@ -82,5 +84,6 @@ void InitVector(NoteVec* Notes, uint32_t InitCapacity);
 void AppendItem(NoteVec* Notes, note_released Note);
 void PopItem(NoteVec* Notes);
 void FreeNoteVecData(NoteVec* Notes);
+void UnorderedRemoveByIndex(NoteVec* Notes, uint32_t Index);
 
 #endif

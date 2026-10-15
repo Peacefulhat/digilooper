@@ -11,23 +11,35 @@ void InitVector(NoteVec* Notes, uint32_t InitCapacity)
     Notes->Capacity = InitCapacity;
 }
 
-void AppendItem(NoteVec* Notes, note_released Note)
+void AppendItem(NoteVec* ReleasedNotes, note_released Note)
 {
-    if(!Notes) {
+    if(!ReleasedNotes) {
         printf("InitVector: not a valid NoteVec ");
         return;
     }
 
-    while(Notes->Count > Notes->Capacity) {
-        Notes->Capacity *= 2;
-    }
+    while(ReleasedNotes->Count >= ReleasedNotes->Capacity) {
 
-    Notes->Data = realloc(Notes->Data, sizeof(note) * Notes->Capacity);
-    assert(Notes->Data != NULL && "Buy More ram");
-    Notes->Data[Notes->Count++] = Note;
+        ReleasedNotes->Capacity *= 2;
+    }
+    ReleasedNotes->Data = realloc(ReleasedNotes->Data, sizeof(note_released) * ReleasedNotes->Capacity);
+    assert(ReleasedNotes->Data != NULL && "Buy More ram");
+    ReleasedNotes->Data[ReleasedNotes->Count++] = Note;
 }
 
 void PopItem(NoteVec* Notes)
+{
+    if (Notes == NULL) {
+        printf("PopItem: invalid NoteVec\n");
+        return;
+    }
+
+    if (Notes->Count > 0) {
+        Notes->Count--;
+    }
+
+}
+/*void PopItem(NoteVec* Notes)
 {
     if(!Notes) {
         printf("InitVector: not a valid NoteVec ");
@@ -39,7 +51,7 @@ void PopItem(NoteVec* Notes)
     }
 }
 
-
+*/
 void FreeNoteVecData(NoteVec* Notes)
 {
     if(!Notes) {
@@ -52,6 +64,19 @@ void FreeNoteVecData(NoteVec* Notes)
     free(Notes->Data);
     Notes->Capacity = DA_INIT_CAP;
     Notes->Count = 0;
+}
+
+void UnorderedRemoveByIndex(NoteVec* Note, uint32_t Index)
+{
+    if(!Note) {
+        printf("UnorderedRemoveByIndex: not a valid NoteVec");
+        return;
+    }
+
+    if((Note->Count > 0) && (Index <= Note->Count - 1)) {
+        Note->Data[Index] = Note->Data[Note->Count - 1];
+        PopItem(Note);
+    }
 }
 
 
@@ -116,7 +141,7 @@ void NoteRelease(note* Note, NoteVec* Notes, uint32_t FrameCount)
         printf("NotePlay: Not a valid note\n");
         return;
     }
-    
+
     if(!Note->Playing) {
         return;
     }
@@ -125,6 +150,26 @@ void NoteRelease(note* Note, NoteVec* Notes, uint32_t FrameCount)
     float Volume = Min(UnclippedVolume, 1.0f); // Volume in terms of sound
     note_released RNote = {.FrameStamp = FrameCount, .Key = Note->Key, .Frequency = Note->Frequency, .Volume = Volume};
     AppendItem(Notes, RNote);
+}
+
+bool NoteReleaseDone(note_released* Note, uint32_t FrameCount)
+{
+    return(FrameCount - Note->FrameStamp) >= RELEASE_FRAME;
+}
+
+float NoteReleasedUpdate(note_released* Note, uint32_t FrameCount)
+{
+    float Sample = (0.0f);
+    if(!Note) {
+        // logging
+        printf("NoteUpdate: Failed to generate Sample for given Frame Count");
+        return (Sample);
+    }
+    float UnclippedVolume = (float)(FrameCount - Note->FrameStamp)/(float)(RELEASE_FRAME);
+    float Volume = (1.0f - Min(UnclippedVolume, 1.0f)) * Note->Volume; // Volume in terms of sound
+    float Time = (float)(FrameCount)/(float)SAMPLE_RATE;
+    Sample = sinf(2 * PI * Time * Note->Frequency) * Volume;
+    return (Sample);
 }
 
 // return sample for specific framecount

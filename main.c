@@ -83,6 +83,7 @@ int main(void)
     type Low            = {.AsF32 = -1.0f};
     type High           = {.AsF32 =  1.0f};
 
+
     // Events Buffer
     events Events = {};
     Events.EventsArr = (event*)malloc(sizeof(event)* EVENT_BUFFER_CAPACITY);
@@ -91,6 +92,8 @@ int main(void)
     AddKeyBoardNotes(&KeyBoardNotes);
     state State = {};
 
+    // Init Capacity NotesReleased
+    InitVector(&NotesReleased, 2);
     Sound Bomb = LoadSound("plant-bomb.wav");
     while (!WindowShouldClose()) {
         float Quant = (BeatTime/QUANT_SECS);
@@ -144,7 +147,7 @@ int main(void)
                 }
 
             } else if(State == RECORD) {
-//                PrintEvents(&Events);
+                // PrintEvents(&Events);
                 State = REPLAY;
             } else if( State == WAIT_UNTIL_END_OF_BAR) {
                 State = REPLAY;
@@ -198,9 +201,24 @@ int main(void)
                     }
                 }
 
+                if(NotesReleased.Count > 0) {
+                    for(uint32_t NoteIndex = NotesReleased.Count; NoteIndex > 0; --NoteIndex) {
+                        if(NoteReleaseDone(&NotesReleased.Data[NoteIndex], FrameCount)) {
+                            UnorderedRemoveByIndex(&NotesReleased, NoteIndex);
+
+                        } else {
+                            // released notes currently playing
+                            NotesPlaying += 1;
+                        }
+                    }
+                }
+
+
+
                 // if there are any keyboardnotes playing for sample, update the note and add it to sample
                 if (NotesPlaying) {
                     float Amplitude = 1.0f/NotesPlaying;
+
                     for(int32_t NoteIndex = 0; NoteIndex <KeyBoardNotes.Count; NoteIndex++) {
                         if(KeyBoardNotes.NoteKeys[NoteIndex].Playing) {
 
@@ -213,6 +231,10 @@ int main(void)
                             Samples[SampleIndex] += NoteUpdate(&NotesReplay.NoteKeys[NoteIndex], FrameCount) * Amplitude;
                         }
                     }
+
+                    for(int32_t NoteIndex = 0; NoteIndex <NotesReleased.Count; NoteIndex++) {
+                        Samples[SampleIndex] += NoteReleasedUpdate(&NotesReleased.Data[NoteIndex], FrameCount) * Amplitude;
+                    }
                     // clamp the smaple
                     Clamp2(&Samples[SampleIndex], Low, High, FLOAT);
                 }
@@ -220,7 +242,7 @@ int main(void)
             }
             UpdateAudioStream(Stream, Samples, SAMPLE_BUFFER_SIZE);
         }
-        
+
         BeginDrawing();
         ClearBackground(BgColor);
         Vector2 Center = {(GetScreenWidth() - 30.0f), 30.0f};
