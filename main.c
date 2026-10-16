@@ -6,7 +6,7 @@
 #define SAMPLE_SIZE 32
 #define CHANNELS    1
 
-global_variable float Samples[SAMPLE_BUFFER_SIZE] = {};
+global_variable float64 Samples[SAMPLE_BUFFER_SIZE] = {};
 global_variable notes KeyBoardNotes = {};
 global_variable notes NotesReplay = {};
 global_variable NoteVec NotesReleased = {};
@@ -27,6 +27,13 @@ typedef struct {
     bool Start;
     uint32_t Semitonei; // semitone index;
 } event;
+
+typedef struct {
+    quant TimeStamp;
+    int32_t Frequency;
+    bool Start;
+    float32 Lifetime;
+} dissipating_ring;
 
 typedef struct {
     event* EventsArr;
@@ -79,7 +86,7 @@ int main(void)
     SetTargetFPS(60);
 
     float BeatTime = 0.0;
-    type_info ClampType = FLOAT;
+    type_info ClampType = FLOAT64;
     type Low            = {.AsF32 = -1.0f};
     type High           = {.AsF32 =  1.0f};
 
@@ -96,8 +103,8 @@ int main(void)
     InitVector(&NotesReleased, 2);
     Sound Bomb = LoadSound("plant-bomb.wav");
     while (!WindowShouldClose()) {
-        float Quant = (BeatTime/QUANT_SECS);
-        float BeatTimePrev = BeatTime;
+        float32 Quant = (BeatTime/QUANT_SECS);
+        float32 BeatTimePrev = BeatTime;
         BeatTime += GetFrameTime();
 
         if(fmodf(BeatTime, BEAT_SECS) < fmodf(BeatTimePrev, BEAT_SECS)) {
@@ -107,13 +114,13 @@ int main(void)
 
             if(Events.Count > 0) {
 
-                uint32_t AmountOfBarsInRecording = (float)(Events.EventsArr[Events.Count - 1].TimeStamp + BAR_QUANT - 1)/BAR_QUANT;
-                uint32_t QuantToPlay = (float)fmodf(Quant, (AmountOfBarsInRecording * BAR_QUANT));
+                uint32_t AmountOfBarsInRecording = (float32)(Events.EventsArr[Events.Count - 1].TimeStamp + BAR_QUANT - 1)/BAR_QUANT;
+                uint32_t QuantToPlay = (float32)fmodf(Quant, (AmountOfBarsInRecording * BAR_QUANT));
 
                 for(int i =0; i < Events.Count; ++i) {
                     if(Events.EventsArr[i].TimeStamp ==  QuantToPlay) {
                         if(Events.EventsArr[i].Start) {
-                            NotePress(&NotesReplay.NoteKeys[Events.EventsArr[i].Semitonei], FrameCount);
+                            NotePress(&NotesReplay.NoteKeys[Events.EventsArr[i].Semitonei]);
                         } else {
                             NoteRelease(&NotesReplay.NoteKeys[Events.EventsArr[i].Semitonei], &NotesReleased, FrameCount);
                         }
@@ -159,7 +166,7 @@ int main(void)
         for(uint32_t NoteIndex = 0;  NoteIndex < KeyBoardNotes.Count; NoteIndex++) {
             if(IsKeyDown(KeyBoardNotes.NoteKeys[NoteIndex].Key)) {
                 if(!KeyBoardNotes.NoteKeys[NoteIndex].Playing) {
-                    NotePress(&KeyBoardNotes.NoteKeys[NoteIndex], FrameCount);
+                    NotePress(&KeyBoardNotes.NoteKeys[NoteIndex]);
 
                     if(State == RECORD) {
                         event Event = {.TimeStamp = Quant, .Start = true, .Semitonei = NoteIndex};
@@ -203,7 +210,7 @@ int main(void)
 
                 if(NotesReleased.Count > 0) {
                     for(uint32_t NoteIndex = NotesReleased.Count; NoteIndex > 0; --NoteIndex) {
-                        if(NoteReleaseDone(&NotesReleased.Data[NoteIndex], FrameCount)) {
+                        if(NoteReleaseDone(&NotesReleased.Data[NoteIndex])) {
                             UnorderedRemoveByIndex(&NotesReleased, NoteIndex);
 
                         } else {
@@ -217,28 +224,30 @@ int main(void)
 
                 // if there are any keyboardnotes playing for sample, update the note and add it to sample
                 if (NotesPlaying) {
-                    float Amplitude = 1.0f/NotesPlaying;
+                    float32 Amplitude = 1.0f/NotesPlaying;
 
                     for(int32_t NoteIndex = 0; NoteIndex <KeyBoardNotes.Count; NoteIndex++) {
                         if(KeyBoardNotes.NoteKeys[NoteIndex].Playing) {
 
-                            Samples[SampleIndex] += NoteUpdate(&KeyBoardNotes.NoteKeys[NoteIndex], FrameCount) * Amplitude;
+                            Samples[SampleIndex] += NoteUpdate(&KeyBoardNotes.NoteKeys[NoteIndex]) * Amplitude;
                         }
                     }
                     // if there are any replaynote playing for sample, update the note and add it to sample
                     for(int32_t NoteIndex = 0; NoteIndex <NotesReplay.Count; NoteIndex++) {
                         if(NotesReplay.NoteKeys[NoteIndex].Playing) {
-                            Samples[SampleIndex] += NoteUpdate(&NotesReplay.NoteKeys[NoteIndex], FrameCount) * Amplitude;
+                            Samples[SampleIndex] += NoteUpdate(&NotesReplay.NoteKeys[NoteIndex]) * Amplitude;
                         }
                     }
 
                     for(int32_t NoteIndex = 0; NoteIndex <NotesReleased.Count; NoteIndex++) {
-                        Samples[SampleIndex] += NoteReleasedUpdate(&NotesReleased.Data[NoteIndex], FrameCount) * Amplitude;
+                        Samples[SampleIndex] += NoteReleasedUpdate(&NotesReleased.Data[NoteIndex]) * Amplitude;
                     }
-                    // clamp the smaple
-                    Clamp2(&Samples[SampleIndex], Low, High, FLOAT);
+                    // i don't see much of diffence for now not clap
+                    // dont to fix clipping clamp the smaple
+                    // Clamp2(&Samples[SampleIndex], Low, High, FLOAT64);
+                    Clamp64(&Samples[SampleIndex], Low, High, FLOAT64);
                 }
-                FrameCount += 1;
+
             }
             UpdateAudioStream(Stream, Samples, SAMPLE_BUFFER_SIZE);
         }
@@ -246,7 +255,7 @@ int main(void)
         BeginDrawing();
         ClearBackground(BgColor);
         Vector2 Center = {(GetScreenWidth() - 30.0f), 30.0f};
-        float Radius = 20.0f;
+        float32 Radius = 20.0f;
         Color CircleColor = RED;
 
         if(State == REPLAY) {
@@ -266,8 +275,8 @@ int main(void)
             AmountOfBarsInRecording = (Events.EventsArr[Events.Count - 1].TimeStamp + BAR_QUANT - 1)/BAR_QUANT;
 
         }
-        float QuantLength = (float)GetScreenWidth() / (float)(BAR_QUANT * AmountOfBarsInRecording);
-        float SemitoneHeight = (float)GetScreenHeight()/(float)KEYBOARD_NOTES_CAPACITY;
+        float32 QuantLength = (float32)GetScreenWidth() / (float32)(BAR_QUANT * AmountOfBarsInRecording);
+        float32 SemitoneHeight = (float32)GetScreenHeight()/(float32)KEYBOARD_NOTES_CAPACITY;
         for(int i =0; i < Events.Count; ++i) {
             Vector2 Center = {Events.EventsArr[i].TimeStamp * QuantLength, Events.EventsArr[i].Semitonei * SemitoneHeight};
             if(Events.EventsArr[i].Start) {
@@ -277,7 +286,7 @@ int main(void)
             }
         }
 
-        float BeatLength = (float)GetScreenWidth() / (float)(BAR_BEATS * AmountOfBarsInRecording);
+        float32 BeatLength = (float32)GetScreenWidth() / (float32)(BAR_BEATS * AmountOfBarsInRecording);
         for (uint32_t Y = 0; Y < BAR_BEATS * AmountOfBarsInRecording; ++Y) {
 
             Vector2 StartPos = {(Y * BeatLength), 0.0f};
@@ -287,8 +296,8 @@ int main(void)
         }
 
         // moving line
-        float MLineX =
-            (fmodf(BeatTime, BAR_SECS * AmountOfBarsInRecording) / (float)(BAR_SECS * AmountOfBarsInRecording) )* GetScreenWidth();
+        float32 MLineX =
+            (fmodf(BeatTime, BAR_SECS * AmountOfBarsInRecording) / (float32)(BAR_SECS * AmountOfBarsInRecording) )* GetScreenWidth();
         Vector2 MLineStartPos = { MLineX, 0.0f };
         Vector2 MLineEndPos   = {MLineX, GetScreenHeight()};
 

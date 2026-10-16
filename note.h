@@ -12,30 +12,45 @@
 #define  local_persist   static
 #define  internal        static
 
-
-#define SAMPLE_BUFFER_SIZE 2048
+typedef float float32;
+typedef double float64;
+#define SAMPLE_BUFFER_SIZE (2048 * 2)
 #define SAMPLE_RATE 44100
 #define MINIMUN_AUDIO (SAMPLE_BUFFER_SIZE * sizeof(float))
 #define KEYBOARD_NOTES_CAPACITY 15
 #define NEXT_SEMI_TONE 1.0594631f // 2^(1/12)
 #define ROOT_NOTE 440
-#define ATTACK_FRAME 10000
+#define ATTACK_FRAME 500
 #define RELEASE_FRAME 10000
+
+//typedef  float (*instrument_callback)(float Semitone, void* Data);
+typedef  float (*instrument_callback)(double X);
+typedef struct {
+//    void* Data;
+    instrument_callback Function; // period of this funciton is 1, and we are using turn angles.
+} instrument;
 
 
 // note key on keyboard and its playing state
 typedef struct {
     bool Playing;
+    int32_t FrameCount;
     int32_t FrameStamp; // current global fram count at which it started playing.
+    // frame count here is in terms of sound like 44000 sample per second,
+    // frame count is where are we in these 44000 sample.
     float Frequency;
     KeyboardKey Key;
+    instrument *Instrument;
 } note;
 
 typedef struct {
-    int32_t FrameStamp; // current global fram count at which it started playing.
+    int32_t FrameCount; // current global fram count at which it started playing.
     float Frequency;
     KeyboardKey Key;
+    int32_t StoppedAtFrame;
+    float StoppedAtVolume;
     float Volume;
+    instrument* Instrument;
 } note_released;
 
 
@@ -52,8 +67,10 @@ typedef struct {
 } notes;
 
 typedef enum {
-    INT,
-    FLOAT,
+    INT32,
+    FLOAT32,
+    INT64,
+    FLOAT64,
     UNKNOWN
 } type_info;
 
@@ -62,18 +79,27 @@ typedef union {
     float   AsF32;
 } type;
 
+// utils
+float Lerp(float A, float B, float T);
+// Instrument Play
+float InstrumentRun (instrument* Instrument, float X);
+
+// notes
 typedef note (*note_callback)(float Semitone);
-bool NoteReleaseDone(note_released* Note, uint32_t FrameCount);
-float NoteReleasedUpdate(note_released* Note, uint32_t FrameCount);
-float NoteUpdate(note* Note, uint32_t FrameCount);
-void NotePress(note* Note, uint32_t FrameCount);
+bool NoteReleaseDone(note_released* Note);
+float64 NoteReleasedUpdate(note_released* Note);
+float64 NoteUpdate(note* Note);
+void NotePress2(note* Note, instrument* Instrument);
+void NotePress(note* Note);
 void NoteRelease(note* Note, NoteVec* Notes, uint32_t FrameCount);
-float GetFreqFromSemiTone(float Semitone);
+float64 GetFreqFromSemiTone(float Semitone);
 void CleanBuffer(float* Buffer, uint32_t BufferSize);
 void AddNote(notes* Notes, note_callback Notefn, float Semitone, KeyboardKey Key);
 void AddKeyBoardNotes(notes* Notes);
-void Clamp2(void* Data, type Low, type High, type_info Info);
-
+void Clamp32(void* Data, type Low, type High, type_info Info);
+void Clamp64(void* Data, type Low, type High, type_info Info);
+float32 Lerp32(float32 A, float32 B, float32 T);
+float64 Lerp64(float64 A, float64 B, float64 T);
 
 // Debug Dynamic Array
 

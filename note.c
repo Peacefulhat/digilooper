@@ -81,7 +81,7 @@ void UnorderedRemoveByIndex(NoteVec* Note, uint32_t Index)
 
 
 //Todo:: Error Logging
-static float Min(float A, float B)
+static float32 Min(float32 A, float32 B)
 {
     if(A < B) {
         return(A);
@@ -90,14 +90,61 @@ static float Min(float A, float B)
     }
 }
 
+// instrument funcitons
+// for now not using the void* Data Signature
+//internal float32 FunctionSine(float32 X, void* Data)
+internal float32 FunctionSine(float64 X)
+{
+    return sin(X * 2 * PI);
+}
+//internal float32 FunctionSquareWave(float32 X, void* Data)
+internal float32 FunctionSquareWave(float64 X) // here x is in period of 1.
+{
+    float64 P = 0.5f; // parametrize square wave
+    X = truncf(X);
+    if(X <= P) {
+        return (1.0f);
+    } else {
+        return (-1.0f);
+    }
+}
 
-float GetFreqFromSemiTone(float Semitone)
+internal float32 FunctionSawTooth(float64 X)
+{
+    float64 P = 0.5f; // parametrize square wave
+    X = truncf(X);
+    if(X <= P) {
+        return Lerp(-1, 1, X/P);
+    } else {
+        return Lerp(1, -1, (X - P)/(1.0f - P));
+    }
+}
+
+// instruments
+global_variable instrument InstrumentSine = {
+    .Function = FunctionSine
+};
+
+global_variable instrument InstrumentSquareWave = {
+    .Function = FunctionSine
+};
+
+global_variable instrument InstrumentSawTooth = {
+    .Function = FunctionSawTooth
+};
+
+float32 InstrumentRun (instrument* Instrument, float32 X)
+{
+    return Instrument->Function(X);
+}
+
+float64 GetFreqFromSemiTone(float32 Semitone)
 {
     return(ROOT_NOTE * pow(NEXT_SEMI_TONE, Semitone));
 }
 
 // Clean the Buffer
-void CleanBuffer(float* Buffer, uint32_t BufferSize)
+void CleanBuffer(float32* Buffer, uint32_t BufferSize)
 {
     if(!Buffer) {
         return;
@@ -107,14 +154,14 @@ void CleanBuffer(float* Buffer, uint32_t BufferSize)
     }
 }
 
-internal note GetNote(float Semitone)
+internal note GetNote(float32 Semitone)
 {
     return(note) {
         .Frequency = GetFreqFromSemiTone(Semitone)
     };
 }
 
-void AddNote(notes* Notes, note_callback Notefn, float Semitone, KeyboardKey Key)
+void AddNote(notes* Notes, note_callback Notefn, float32 Semitone, KeyboardKey Key)
 {
     if(!Notes || !Notefn) {
         return;
@@ -125,14 +172,14 @@ void AddNote(notes* Notes, note_callback Notefn, float Semitone, KeyboardKey Key
     Notes->Count++;
 }
 
-void NotePress(note* Note, uint32_t FrameCount)
+void NotePress(note* Note)
 {
     if(!Note) {
         printf("NotePlay: Not a valid note\n");
         return;
     }
     Note->Playing = true;
-    Note->FrameStamp = FrameCount;
+    Note->FrameCount = 0;
 }
 
 void NoteRelease(note* Note, NoteVec* Notes, uint32_t FrameCount)
@@ -142,49 +189,56 @@ void NoteRelease(note* Note, NoteVec* Notes, uint32_t FrameCount)
         return;
     }
 
-    if(!Note->Playing) {
-        return;
+    if(Note->Playing) {
+        Note->Playing = false;
+        float32 UnclippedVolume = (float32)(FrameCount - Note->FrameStamp)/(float32)(ATTACK_FRAME);
+        float32 Volume = Min(UnclippedVolume, 1.0f); // Volume in terms of sound
+        note_released RNote = {.FrameCount = Note->FrameCount,
+                               .Key = Note->Key,
+                               .Frequency = Note->Frequency,
+                               .StoppedAtFrame= Note->FrameCount,
+                               .StoppedAtVolume = Volume
+                              };
+        AppendItem(Notes, RNote);
     }
-    Note->Playing = false;
-    float UnclippedVolume = (float)(FrameCount - Note->FrameStamp)/(float)(ATTACK_FRAME);
-    float Volume = Min(UnclippedVolume, 1.0f); // Volume in terms of sound
-    note_released RNote = {.FrameStamp = FrameCount, .Key = Note->Key, .Frequency = Note->Frequency, .Volume = Volume};
-    AppendItem(Notes, RNote);
 }
 
-bool NoteReleaseDone(note_released* Note, uint32_t FrameCount)
+bool NoteReleaseDone(note_released* Note)
 {
-    return(FrameCount - Note->FrameStamp) >= RELEASE_FRAME;
+    return(Note->FrameCount - Note->StoppedAtFrame) >= RELEASE_FRAME;
 }
 
-float NoteReleasedUpdate(note_released* Note, uint32_t FrameCount)
+float64 NoteReleasedUpdate(note_released* Note)
 {
-    float Sample = (0.0f);
+    float64 Sample = (0.0f);
     if(!Note) {
         // logging
         printf("NoteUpdate: Failed to generate Sample for given Frame Count");
         return (Sample);
     }
-    float UnclippedVolume = (float)(FrameCount - Note->FrameStamp)/(float)(RELEASE_FRAME);
-    float Volume = (1.0f - Min(UnclippedVolume, 1.0f)) * Note->Volume; // Volume in terms of sound
-    float Time = (float)(FrameCount)/(float)SAMPLE_RATE;
-    Sample = sinf(2 * PI * Time * Note->Frequency) * Volume;
+    float64 UnclippedVolume = (float64)(Note->FrameCount - Note->StoppedAtFrame)/(float64)(RELEASE_FRAME);
+    float64 Volume = (1.0f - Min(UnclippedVolume, 1.0f)) * Note->StoppedAtVolume; // Volume in terms of sound
+    float64 Time = (float64)(Note->FrameCount)/(float64)SAMPLE_RATE;
+    Note->FrameCount += 1;
+    Sample = InstrumentSine.Function(Time * Note->Frequency) * Volume;
     return (Sample);
 }
 
 // return sample for specific framecount
-float NoteUpdate(note* Note, uint32_t FrameCount)
+float64 NoteUpdate(note* Note)
 {
-    float Sample = (0.0f);
+    float64 Sample = (0.0f);
     if(!Note) {
         // logging
         printf("NoteUpdate: Failed to generate Sample for given Frame Count");
         return (Sample);
     }
-    float UnclippedVolume = (float)(FrameCount - Note->FrameStamp)/(float)(ATTACK_FRAME);
-    float Volume = Min(UnclippedVolume, 1.0f); // Volume in terms of sound
-    float Time = (float)(FrameCount)/(float)SAMPLE_RATE;
-    Sample = sinf(2 * PI * Time * Note->Frequency) * Volume;
+    // TODO: use Note, Frame Count and remove frame stamp
+    float64 UnclippedVolume = (float64)(Note->FrameCount)/(float64)(ATTACK_FRAME);
+    float64 Volume = Min(UnclippedVolume, 1.0f); // Volume in terms of sound
+    float64 Time = (float64)(Note->FrameCount)/(float64)SAMPLE_RATE;
+    Note->FrameCount += 1;
+    Sample = InstrumentSine.Function(Time * Note->Frequency) * Volume;
     return (Sample);
 }
 
@@ -208,13 +262,13 @@ void AddKeyBoardNotes(notes* Notes)
     AddNote(Notes, GetNote, 12, KEY_COMMA);
 }
 
-void Clamp2(void* Data, type Low, type High, type_info Info)
+void Clamp32(void* Data, type Low, type High, type_info Info)
 {
     if(!Data) {
         return;
     }
 
-    if(Info == INT) {
+    if(Info == INT32) {
         if(*((int32_t*)Data) < Low.AsI32) {
             *((int32_t*)Data) = Low.AsI32;
         }
@@ -223,16 +277,56 @@ void Clamp2(void* Data, type Low, type High, type_info Info)
             *((int32_t*)Data) = High.AsI32;
         }
 
-    } else if(Info == FLOAT) {
+    } else if(Info == FLOAT32) {
 
-        if(*((float*)Data) < Low.AsF32) {
-            *((float*)Data) = Low.AsF32;
+        if(*((float32*)Data) < Low.AsF32) {
+            *((float32*)Data) = Low.AsF32;
         }
 
-        if(*((float*)Data) > High.AsF32) {
-            *((float*)Data) = High.AsF32;
+        if(*((float32*)Data) > High.AsF32) {
+            *((float32*)Data) = High.AsF32;
         }
     } else {
         printf("Unknown type");
     }
+}
+
+
+void Clamp64(void* Data, type Low, type High, type_info Info)
+{
+    if(!Data) {
+        return;
+    }
+
+    if(Info == INT64) {
+        if(*((int64_t*)Data) < Low.AsI32) {
+            *((int64_t*)Data) = Low.AsI32;
+        }
+
+        if(*((int64_t*)Data) > High.AsI32) {
+            *((int64_t*)Data) = High.AsI32;
+        }
+
+    } else if(Info == FLOAT64) {
+
+        if(*((float64*)Data) < Low.AsF32) {
+            *((float64*)Data) = Low.AsF32;
+        }
+
+        if(*((float64*)Data) > High.AsF32) {
+            *((float64*)Data) = High.AsF32;
+        }
+    } else {
+        printf("Unknown type");
+    }
+}
+
+float32 Lerp32(float32 A, float32 B, float32 T)
+{
+    return A + T * (B - A);
+}
+
+float64 Lerp64(float64 A, float64 B, float64 T)
+{
+    return A + T * (B - A);
 }
