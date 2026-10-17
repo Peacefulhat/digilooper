@@ -115,7 +115,8 @@ internal float32 FunctionSawTooth(float64 X)
     X = truncf(X);
     if(X <= P) {
         return Lerp(-1, 1, X/P);
-    } else {
+    }
+    if(P > 0){
         return Lerp(1, -1, (X - P)/(1.0f - P));
     }
 }
