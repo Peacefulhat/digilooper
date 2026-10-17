@@ -26,6 +26,7 @@ typedef struct {
     quant TimeStamp;
     bool Start;
     uint32_t Semitonei; // semitone index;
+    instrument* Instrument;
 } event;
 
 typedef struct {
@@ -135,7 +136,9 @@ int main(void)
                 Quant = 0;
                 for(uint32_t I= 0; I < KeyBoardNotes.Count; ++I ) {
                     if(KeyBoardNotes.NoteKeys[I].Playing) {
-                        event Event = {.TimeStamp = Quant, .Start = true, .Semitonei = I};
+                        event Event = {.TimeStamp = Quant, .Start = true, .Semitonei = KeyBoardNotes.NoteKeys[I].Frequency,
+                        .Instrument = KeyBoardNotes.NoteKeys[I].Instrument
+                    };
                         AddEvent(&Events, Event);
                     }
                 }
@@ -178,7 +181,8 @@ int main(void)
                 if(KeyBoardNotes.NoteKeys[NoteIndex].Playing) {
                     NoteRelease(&KeyBoardNotes.NoteKeys[NoteIndex], &NotesReleased, FrameCount);
                     if(State == RECORD) {
-                        event Event = {.TimeStamp = Quant, .Start = false, .Semitonei = NoteIndex};
+                        event Event = {.TimeStamp = Quant, .Start = false, .Semitonei = KeyBoardNotes.NotesKey[NoteIndex].Frequency,
+                    .Instrument = };
                         AddEvent(&Events, Event);
                     }
                 }

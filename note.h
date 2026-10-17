@@ -20,6 +20,7 @@ typedef double float64;
 #define KEYBOARD_NOTES_CAPACITY 15
 #define NEXT_SEMI_TONE 1.0594631f // 2^(1/12)
 #define ROOT_NOTE 440
+
 #define ATTACK_FRAME 500
 #define RELEASE_FRAME 10000
 

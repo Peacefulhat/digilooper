@@ -1,0 +1,6 @@
+0: redesign the whole api, cpu bug also.
+1: fix the instrument bugs, sound sample creation, events , dynamic array(implement a generic dynamic array implementation),
+   add some color animations for recording, replay, playing of notes in a instument.
+2: add mouse scroll wheel as an input to control the period.
+
+
